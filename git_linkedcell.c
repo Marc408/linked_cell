@@ -81,7 +81,7 @@ void printList(ParticleList *pList)
     //  Check if pList is NULL
     if(pList == NULL){
 
-        printf("pList is NULL");
+        printf("ERROR: List does not exist!");
     }
 
     if (NULL != pList->next){
@@ -97,6 +97,13 @@ void printList(ParticleList *pList)
     
 }
 
+void freeLists_LC(Cell* grid, int pnc){
+
+    for(int i = 0; i < pnc; i++){
+
+        free(grid[i]);
+    }
+}
 
 //  Update position for a single particle
 void updateX(Particle *p, real delta_t)
@@ -168,8 +175,9 @@ void moveParticles_LC(Cell *grid, int *nc, real *l)
 
                 ParticleList **q = &grid[index(ic, nc)];
                 ParticleList *i = *q;
-                while (NULL != i)
+                while (NULL != i->next)
                 {
+                    printf("Index %d: Particle at %f | %f pointing to %c\n", index(ic,nc), i->p.x[0], i->p.x[1], i->next->p.body);
 
                     //  if a particle leaves the simulation area, update its position to the opposite side
                     for(int d = 0; d < DIM; d++){
@@ -190,14 +198,12 @@ void moveParticles_LC(Cell *grid, int *nc, real *l)
 #if 3 == DIM
                         || (ic[2] != kc[2])
 #endif
-                    )
-                    {
+                    ){
 
                         deleteList(q);
                         insertList(&grid[index(kc, nc)], i);
                     }
-                    else
-                    {
+                    else{
 
                         q = &i->next;
                     }
@@ -244,7 +250,7 @@ void compV_LC(Cell *grid, int *nc, real *l, real delta_t)
 void compF_LC(Cell *grid, int *nc)
 {
 
-    //  ic is the current cell, kc is a cell NEIGHBORING the current cell (every cell has 8 neighbours + itself)
+    //  ic is the current cell, kc is a cell NEIGHBORING the current cell or the current cell (every cell has 8 neighbours + itself)
     int ic[DIM], kc[DIM];
 
     for (ic[0] = 0; ic[0] < nc[0]; ic[0]++)
@@ -252,51 +258,48 @@ void compF_LC(Cell *grid, int *nc)
 #if 3 == DIM
             for (ic[2] = 0; ic[2] < nc[2]; ic[2]++)
 #endif
-
-                //debug
-                printf("current cell index is %d\n\n", index(ic,nc));
-                
-
-                for (ParticleList *i = grid[index(ic, nc)]; NULL != i; i = i->next)
                 {
+                    printf("\nIn compF_LC: Index is %d\n", index(ic,nc));
+                    for (ParticleList *i = grid[index(ic, nc)]; NULL != i; i = i->next)
+                    {
+                        printf("Inside this for particle %c at %.1f | %.1f pointing to a Particle %c\n", i->p.body, i->p.x[0], i->p.x[1], i->next->p.body);
+                        for (int d = 0; d < DIM; d++)
+                            i->p.F[d] = 0;
 
-                    for (int d = 0; d < DIM; d++)
-                        i->p.F[d] = 0;
-
-                    for (kc[0] = ic[0] - 1; kc[0] <= ic[0] + 1; kc[0]++)
-                        for (kc[1] = ic[1] - 1; kc[1] <= ic[1] + 1; kc[1]++)
-#if 3 == DIM
-                            for (kc[2] = ic[2] - 1; kc[2] <= ic[2] + 1; kc[2]++)
-#endif
-                            {
-                                // if the neighbor cell kc is out of range of the grid
-                                // take the cell on the opposite side of it
-                                for (int d = 0; d < DIM; d++)
+                        for (kc[0] = ic[0] - 1; kc[0] <= ic[0] + 1; kc[0]++)
+                            for (kc[1] = ic[1] - 1; kc[1] <= ic[1] + 1; kc[1]++)
+    #if 3 == DIM
+                                for (kc[2] = ic[2] - 1; kc[2] <= ic[2] + 1; kc[2]++)
+    #endif
                                 {
-                                    if (kc[d] < 0)
-                                        kc[d] = nc[d] - 1;
-                                    if (kc[d] >= nc[d])
-                                        kc[d] = 0;
-                                }
-
-                                
-
-                                //  TODO check distance beforehand (rcut around particle)
-                                
-                                //  for every particle j in cell kc, compute the force on particle i
-                                for (ParticleList *j = grid[index(kc, nc)]; NULL != j; j = j->next)
-                                    if (i != j)
+                                    // if the neighbor cell kc is out of range of the grid
+                                    // take the cell on the opposite side of it
+                                    for (int d = 0; d < DIM; d++)
                                     {
-
-                                        real r = 0;
-                                        for (int d = 0; d < DIM; d++)
-                                            r += sqr(j->p.x[d] - i->p.x[d]);
-                                        if (r <= sqr(r_cut))
-                                            force2(&i->p, &j->p);
+                                        if (kc[d] < 0)
+                                            kc[d] = nc[d] - 1;
+                                        if (kc[d] >= nc[d])
+                                            kc[d] = 0;
                                     }
-                            }
+                                    //  TODO check distance beforehand (rcut around particle)
+                                    
+                                    //  for every particle j in cell kc, compute the force on particle i
+                                    for (ParticleList *j = grid[index(kc, nc)]; NULL != j; j = j->next)
+                                        if (i != j)
+                                        {
+
+                                            real r = 0;
+                                            for (int d = 0; d < DIM; d++)
+                                                r += sqr(j->p.x[d] - i->p.x[d]);
+                                            if (r <= sqr(r_cut))
+                                                force2(&i->p, &j->p);
+                                        }
+                                }
+                        printf("Done with this one\n");
+                    }
                 }
 }
+
 
 
 //  get parameters from user input
@@ -349,88 +352,55 @@ void inputParameters_LC(real *delta_t, real *t_end, int *N_A, int *N_B, int *nc,
 void initData_LC(Cell *grid, int N_A, int N_B, int *nc, real *l)
 {
 
-    int count = 0;
+    
     int kc[DIM];
 
-    //  Array for all particles
-    ParticleList *pList = (ParticleList *)malloc((N_A + N_B) * sizeof(*pList));
+    for(int i = 0; i < sqrt(N_A); i++){
+        for(int j = 0; j < sqrt(N_A); j++){
 
-    
+            ParticleList *temp = malloc(sizeof(ParticleList));
 
-    //  define standard attributes
-    for (int i = 0; i < N_A; i++)
-    {
+            temp->p.body = 'A';
+            temp->p.m = 1;
+            temp->p.v[0] = 0.1;
+            temp->p.v[1] = 0.1;
+            temp->p.x[0] = i;
+            temp->p.x[1] = j;
+            
+            temp->next = malloc(sizeof(ParticleList));
+            temp->next = NULL;
 
-        pList[i].p.body = 'A';
-        pList[i].p.m = 1;
-        pList[i].p.v[0] = 0.1;
-        pList[i].p.v[1] = 0.1;
+            for(int d = 0; d < DIM; d++)
+                kc[d] = (int)floor(temp->p.x[d] * nc[d] / l[d]);
 
-        //pList[i].next = NULL;
-    }
-
-    for (int i = N_A; i < N_B + N_A; i++)
-    {
-
-        pList[i].p.body = 'B';
-        pList[i].p.m = 1;
-        pList[i].p.v[0] = 0.1;
-        pList[i].p.v[1] = -15;
-
-        //pList[i].next = NULL;
-    }
-
-    //  define positions for particles in A
-    for (int i = 0; i < sqrt(N_A); i++)
-    {
-
-        for (int j = 0; j < sqrt(N_A); j++)
-        {
-            pList[count].p.x[0] = i;
-            pList[count].p.x[1] = j;
-
-            count++;
+            insertList(&grid[index(kc, nc)], temp);
         }
     }
 
-    //  define positions for particles in B
-    for (int i = (sqrt(N_A) / 2) - (sqrt(N_B) / 2); i < (sqrt(N_A) / 2) - (sqrt(N_B) / 2) + sqrt(N_B); i++)
-    {
+    for (int i = (sqrt(N_A) / 2) - (sqrt(N_B) / 2); i < (sqrt(N_A) / 2) - (sqrt(N_B) / 2) + sqrt(N_B); i++){
 
-        for (int j = sqrt(N_A) + 10; j < (sqrt(N_A) + 10) + sqrt(N_B); j++)
-        {
+        for (int j = sqrt(N_A) + 10; j < (sqrt(N_A) + 10) + sqrt(N_B); j++){
 
-            pList[count].p.x[0] = i;
-            pList[count].p.x[1] = j;
+            ParticleList *temp = malloc(sizeof(ParticleList));
 
-            count++;
-        }
+            temp->p.body = 'B';
+            temp->p.m = 1;
+            temp->p.v[0] = 0.1;
+            temp->p.v[1] = -15;
+            temp->p.x[0] = i;
+            temp->p.x[1] = j;
+
+            temp->next = malloc(sizeof(ParticleList));
+            temp->next = NULL;
+
+            printf("\nEIN B GEMACHT\n");
+
+            for(int d = 0; d < DIM; d++)
+                kc[d] = (int)floor(temp->p.x[d] * nc[d] / l[d]);
+
+            insertList(&grid[index(kc, nc)], temp);        }
     }
 
-    //  check which cell each particle is closest to and insert it into that list
-    for (int i = 0; i < (N_A + N_B); i++)
-    {
-        // pointer to current particle
-        ParticleList *pl = &pList[i];
-        for (int d = 0; d < DIM; d++)
-        {
-            // check which cell to pick
-            kc[d] = (int)floor(pl->p.x[d] * nc[d] / l[d]);
-        }
-
-        //debug
-        printf("index ist %d\n", index(kc,nc));
-
-        //insert particle as first element in to that cell kc
-        insertList(&grid[index(kc, nc)], pl);
-    }
-
-    //debug printing every particle in the simulation (position and the element it points to)
-    for (int i = 0; i < (N_A + N_B); i++)
-    {
-
-        printf("Particle no. %d: %c at %lf | %lf with velocity %lf and follower is \n\n", i, pList[i].p.body, pList[i].p.x[0], pList[i].p.x[1], pList[i].p.v[1]);
-    }
 }
 
 
@@ -440,9 +410,11 @@ void timeIntegration_LC(real t, real delta_t, real t_end, Cell *grid, int *nc, r
     // i is used for outputfile (TODO)
     int i = 0;
 
-    printf("Starting the integration");
+    printf("\nStarting the integration\n");
 
     compF_LC(grid, nc);
+
+    printf("Did compf once!");
 
     while (t < t_end)
     {
@@ -482,22 +454,51 @@ int main()
 
     Cell *grid = (Cell *)malloc(pnc * sizeof(*grid));
     
+    if (*grid == NULL) {
+        
+        printf("ERROR: Memory fault");
+        return 1;
+    }
+    
+    for(int i = 0; i < pnc; i++){
+
+        grid[i] = malloc(sizeof(ParticleList));
+        grid[i]->next = NULL;
+        //grid[i] = NULL;
+    }
+
     //DEBUG
     printf("nc1 = %d \nnc2 = %d \nN_A = %d \nN_B = %d \npnc = %d \n\n", nc[0], nc[1], N_A, N_B, pnc);
 
     //DEBUG END
 
-    initData_LC(grid, N_A, N_B, nc, l);
+    initData_LC(grid, N_A, N_B, nc, l);    
 
-    //  debug
-    printList(grid[0]);
-    
-
-    // not used in testing yet:
     //timeIntegration_LC(0, delta_t, t_end, grid, nc, l);
+    
+/*
+    for(ParticleList *z = grid[0]; NULL != z; z = z->next){
+
+        z->p.x[0] += 20;
+        z->p.x[1] += 30;
+    }
+
+        printf("\nMOVED PARTICLES\n");
+*/
+    //moveParticles_LC(grid, nc, l);
+
+    
+    for(int i = 0; i < pnc; i++){
+
+        printList(grid[i]);
+    }    
+    compF_LC(grid,nc);
+    //printf("anchor is %c at %d %d \n", grid[0]->p.body,grid[0]->p.x[0],grid[0]->p.x[1]);
+
+    freeLists_LC(grid, pnc);
     free(grid);
     
     //debug
-    printf("SUCCESS");
+    printf("\nSUCCESS\n");
     return 0;
 }
