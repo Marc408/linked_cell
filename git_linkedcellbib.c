@@ -78,22 +78,27 @@ void deleteList(ParticleList **q)
 //  print all list elements recursive
 void printList(ParticleList *pList)
 {
-    
     //  Check if pList is NULL
     if(pList == NULL){
 
-        printf("ERROR: List does not exist!");
-    }
+        printf("This cell is empty!\n");
+    }else if(pList != NULL && pList->next == NULL){ // check if only 1 element in list
 
-    if (NULL != pList->next){
+        printf("Particle of body %c at %.1f | %.1f pointing to NULL\n", pList->p.body, pList->p.x[0], pList->p.x[1]);
+        printf("-> End of cell \n");
+    }else{
 
-        printf("Particle of body %c at %lf %lf pointing to Particle %c\n", pList->p.body, pList->p.x[0], pList->p.x[1], pList->next->p.body);
-        printList(pList->next);
-    }
-    else
-    {
+        while(pList->next != NULL){
 
-        printf("\n End of cell \n");
+            printf("Particle of body %c at %.1f | %.1f pointing to Particle %c at %.1f | %.1f\n", pList->p.body, pList->p.x[0], pList->p.x[1], pList->next->p.body, pList->next->p.x[0], pList->next->p.x[1]);
+            
+            pList = pList->next;
+            if(pList->next == NULL){
+
+                printf("Particle of body %c at %.1f | %.1f pointing to NULL\n", pList->p.body, pList->p.x[0], pList->p.x[1]);
+                printf("-> End of cell \n");
+            }
+        }
     }
     
 }
@@ -164,29 +169,36 @@ void moveParticles_LC(Cell *grid, int *nc, real *l)
     int ic[DIM], kc[DIM];
 
     //  iterate over every cell (/list)
-    for (ic[0] = 0; ic[0] <= nc[0]; ic[0]++)
+    for (ic[0] = 0; ic[0] < nc[0]; ic[0]++)
 
-        for (ic[1] = 0; ic[1] <= nc[1]; ic[1]++)
+        for (ic[1] = 0; ic[1] < nc[1]; ic[1]++)
 
 #if 3 == DIM
             for (ic[2] = 0; ic[2] <= nc[2]; ic[2]++)
 #endif
 
             {
-
+                printf("\nMovingParticles for cell no. %d\n", index(ic,nc));
                 ParticleList **q = &grid[index(ic, nc)];
                 ParticleList *i = *q;
-                while (NULL != i->next)
+                while (NULL != i)
                 {
-                    printf("Index %d: Particle at %f | %f pointing to %c\n", index(ic,nc), i->p.x[0], i->p.x[1], i->next->p.body);
 
+                    if(i->next == NULL){
+
+                        printf("Index %d: Particle of body %c at %.1f | %.1f pointing to NULL\n", index(ic,nc), i->p.body, i->p.x[0], i->p.x[1]);
+
+                    }else{
+
+                        printf("Index %d: Particle of body %c at %.1f | %.1f pointing to %c\n", index(ic,nc), i->p.body, i->p.x[0], i->p.x[1], i->next->p.body);
+                    }
                     //  if a particle leaves the simulation area, update its position to the opposite side
                     for(int d = 0; d < DIM; d++){
 
                         if(i->p.x[d] < 0)
-                            i->p.x[d] = l[d] -1;
+                            i->p.x[d] = l[d] + i->p.x[d];
                         if(i->p.x[d] >= l[d])
-                            i->p.x[d] = 0;
+                            i->p.x[d] = 0 + (i->p.x[d] - l[d]);
                     }
 
                     for (int d = 0; d < DIM; d++)
@@ -200,15 +212,27 @@ void moveParticles_LC(Cell *grid, int *nc, real *l)
                         || (ic[2] != kc[2])
 #endif
                     ){
-
                         deleteList(q);
                         insertList(&grid[index(kc, nc)], i);
+                        printf("---Particle has been moved to CELL No. %d!---\n", index(kc,nc));
+
+                        if(i->next == NULL)
+                            i = *q;
                     }
                     else{
 
-                        q = &i->next;
+                        if(i->next != NULL)                        
+                            q = &i->next;
                     }
-                    i = *q;
+
+                    if(i->next != NULL){
+
+                        i = *q;
+                    }else{
+
+                        // If i is the last element in this cell, set i = NULL to break the loop
+                        i = NULL;
+                    }
                 }
             }
 }
@@ -263,7 +287,14 @@ void compF_LC(Cell *grid, int *nc)
                     printf("\nIn compF_LC: Index is %d\n", index(ic,nc));
                     for (ParticleList *i = grid[index(ic, nc)]; NULL != i; i = i->next)
                     {
-                        printf("Inside this for particle %c at %.1f | %.1f pointing to a Particle %c\n", i->p.body, i->p.x[0], i->p.x[1], i->next->p.body);
+                        if(i->next == NULL){
+                        
+                            printf("Inside this for particle %c at %.1f | %.1f pointing to NULL\n", i->p.body, i->p.x[0], i->p.x[1]);
+                        }else{
+
+                            printf("Inside this for particle %c at %.1f | %.1f pointing to a Particle %c\n", i->p.body, i->p.x[0], i->p.x[1], i->next->p.body);
+                        }
+
                         for (int d = 0; d < DIM; d++)
                             i->p.F[d] = 0;
 
@@ -288,7 +319,7 @@ void compF_LC(Cell *grid, int *nc)
                                     for (ParticleList *j = grid[index(kc, nc)]; NULL != j; j = j->next)                                        
                                         if (i != j)
                                         {
-                                            printf("j is %c at %f | %f", j->p.body, j->p.x[0], j->p.x[1]);
+                                            printf("j is %c at %f | %f\n", j->p.body, j->p.x[0], j->p.x[1]);
                                             real r = 0;
                                             for (int d = 0; d < DIM; d++)
                                                 r += sqr(j->p.x[d] - i->p.x[d]);
@@ -296,10 +327,8 @@ void compF_LC(Cell *grid, int *nc)
                                                 force2(&i->p, &j->p);
                                         }
                                 }
-                        if(i->next == NULL){
-                            printf("NEXT IS NULL");
-                        }
-                        printf("Done with this one\n");
+
+                        printf("compF done with this one\n\n");
                     }
                 }
 }
@@ -349,7 +378,7 @@ void inputParameters_LC(real *delta_t, real *t_end, int *N_A, int *N_B, int *nc,
         nc[d] = nc_temp[d];
     }
 
-    printf("\n\t\t\t---------Parameters initialized--------\n\n");
+    printf("\n\t\t\t----------Parameters initialized---------\n\n");
 }
 
 //  generate all particles in their starting position (2 squares, B is above A, B moving towards A)
@@ -371,8 +400,8 @@ void initData_LC(Cell *grid, int N_A, int N_B, int *nc, real *l)
             temp->p.x[0] = i;
             temp->p.x[1] = j;
             
-            temp->next = malloc(sizeof(ParticleList));
-            //temp->next = NULL;
+            //temp->next = malloc(sizeof(ParticleList));
+            temp->next = NULL;
 
             for(int d = 0; d < DIM; d++)
                 kc[d] = (int)floor(temp->p.x[d] * nc[d] / l[d]);
@@ -394,10 +423,8 @@ void initData_LC(Cell *grid, int N_A, int N_B, int *nc, real *l)
             temp->p.x[0] = i;
             temp->p.x[1] = j;
 
-            temp->next = malloc(sizeof(ParticleList));
-            //temp->next = NULL;
-
-            printf("\nEIN B GEMACHT\n");
+            //temp->next = malloc(sizeof(ParticleList));
+            temp->next = NULL;
 
             for(int d = 0; d < DIM; d++)
                 kc[d] = (int)floor(temp->p.x[d] * nc[d] / l[d]);
@@ -431,7 +458,7 @@ void timeIntegration_LC(real t, real delta_t, real t_end, Cell *grid, int *nc, r
 
         i++;
         if (t < t_end)
-            printf("\n==================================================================================\n\n");
+            printf("\n==================================Done with Integration No. %d=====================================\n\n", i);
         else
             printf("\n\t\t\t----------Integration finished----------\n\n");
     }
@@ -463,12 +490,12 @@ int main()
         printf("ERROR: Memory fault");
         return 1;
     }
+
+    ParticleList *temp;
     
     for(int i = 0; i < pnc; i++){
 
-        grid[i] = malloc(sizeof(ParticleList));
-        grid[i]->next = NULL;
-        //grid[i] = NULL;
+        grid[i] = NULL;        
     }
 
     //DEBUG
@@ -478,26 +505,32 @@ int main()
 
     initData_LC(grid, N_A, N_B, nc, l);    
 
-    //timeIntegration_LC(0, delta_t, t_end, grid, nc, l);
+    timeIntegration_LC(0, delta_t, t_end, grid, nc, l);
     
+    for(int i = 0; i < pnc; i++){
+
+        printf("\n\n---PRINTING CELL No. %d:---\n", i);
+        printList(grid[i]);
+    }    
+
 /*
     for(ParticleList *z = grid[0]; NULL != z; z = z->next){
 
-        z->p.x[0] += 20;
-        z->p.x[1] += 30;
+        z->p.x[1] += 60;
     }
 
-        printf("\nMOVED PARTICLES\n");
-*/
-    //moveParticles_LC(grid, nc, l);
+        printf("\n\n-----------MOVED PARTICLES-----------\n\n");
+
+    moveParticles_LC(grid, nc, l);
 
     
     for(int i = 0; i < pnc; i++){
 
+        printf("\n\n---PRINTING CELL No. %d:---\n", i);
         printList(grid[i]);
     }    
-
-    compF_LC(grid,nc);
+*/
+    //compF_LC(grid,nc);
     //printf("anchor is %c at %d %d \n", grid[0]->p.body,grid[0]->p.x[0],grid[0]->p.x[1]);
 
     freeLists_LC(grid, pnc);
