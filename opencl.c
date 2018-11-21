@@ -230,7 +230,7 @@ int runCL(int *a, int *b, int *result, int N){
     assert(err == CL_SUCCESS);
 
     //allocate memory on the device to hold and store data
-    buffer_size = sizeof(int) * N;
+    buffer_size = sizeof(ParticleList) * N;
 
     ParticleList *asvm = (ParticleList *)clSVMAlloc(context, CL_MEM_READ_ONLY | CL_MEM_SVM_FINE_GRAIN_BUFFER, buffer_size, 0);
     ParticleList *bsvm = (ParticleList *)clSVMAlloc(context, CL_MEM_READ_ONLY | CL_MEM_SVM_FINE_GRAIN_BUFFER, buffer_size, 0);
@@ -243,7 +243,7 @@ int runCL(int *a, int *b, int *result, int N){
         //printf("%d\n", asvm[i]);
     }
 
-    printf("%p and %p \n", (void*)&asvm[0], (void*)&asvm[1]);
+    printf("%p is %.1f and %p is %.1f \n", (void*)&asvm[0], asvm[0].p.x.s[0], (void*)&asvm[1], asvm[1].p.x.s[0]);
 
 
     
@@ -285,9 +285,9 @@ int runCL(int *a, int *b, int *result, int N){
     //                            result, 0, NULL, NULL));
 
     //clFinish(cmd_queue);
-    for(int i = 1; i < N; i *= 2){
-
-        printf("%d\n", resultsvm[i].p.x.s[0]);
+    for(int i = 0; i < N; i += 1){
+        
+        printf("%f %d\n", resultsvm[i].p.x.s[0],i);
     }
 
     // free memory
@@ -304,7 +304,7 @@ int runCL(int *a, int *b, int *result, int N){
 
 int main(){
 
-    int N = 100;
+    int N = 5;
 
     int *a = (int *)malloc(N * sizeof(int));
     int *b = (int *)malloc(N * sizeof(int));
